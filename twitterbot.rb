@@ -10,7 +10,6 @@ config_options = {
   access_token_secret: ENV['TWITTER_ACCESS_TOKEN_SECRET']
 }
 
-streaming_client = Twitter::Streaming::Client.new(config_options)
 
 class TwitterREST
   attr_reader :client
@@ -36,6 +35,7 @@ class ParseTweet
   end
 end
 
+streaming_client = Twitter::Streaming::Client.new(config_options)
 twitter_rest = TwitterREST.new(Twitter::REST::Client.new(config_options))
 
 streaming_client.user do |object|
