@@ -35,6 +35,8 @@ end
 
 twitter_rest = TwitterREST.new(Twitter::REST::Client.new(config_options))
 
+print config_options
+
 streaming_client.user do |object|
   case object
   when Twitter::Tweet
