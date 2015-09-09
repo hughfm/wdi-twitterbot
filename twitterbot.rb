@@ -1,7 +1,9 @@
 require 'rubygems'
 require 'bundler/setup'
 
-require 'twitter'
+require_relative 'wdi-api'
+require_relative 'twitterbot-tweets'
+require_relative 'twitter-api'
 
 config_options = {
   consumer_key: ENV['TWITTER_CONSUMER_KEY'],
@@ -10,41 +12,30 @@ config_options = {
   access_token_secret: ENV['TWITTER_ACCESS_TOKEN_SECRET']
 }
 
+twitter_stream = TwitterStream.new(config_options)
+twitter_rest = TwitterREST.new(config_options)
 
-class TwitterREST
-  attr_reader :client
-
-  def initialize(client)
-    @client = client
-  end
-
-  def user_id
-    @client.user.id
-  end
-
-  def reply_to(tweet, recipient_name, message)
-    @client.update("@#{recipient_name} #{message}", {
-        in_reply_to_status: tweet
-      })
-  end
-end
-
-class ParseTweet
-  def self.extract_bangs_from(tweet)
-    tweet.full_text.scan(/(?:^|\s)!(\w+)\b/).flatten
-  end
-end
-
-streaming_client = Twitter::Streaming::Client.new(config_options)
-twitter_rest = TwitterREST.new(Twitter::REST::Client.new(config_options))
-
-streaming_client.user do |object|
+twitter_stream.client.user do |object|
   case object
   when Twitter::Tweet
-    unless object.user.id == twitter_rest.user_id
-      user = object.user
-      twitter_rest.reply_to(object, user.screen_name, "thanks for the tweet.")
-      print ParseTweet.extract_bangs_from(object)
+    user = object.user
+    bangs = ParseTweet.extract_bangs_from(object) unless twitter_rest.is_me? user
+    ParseTweet.log(object, bangs)
+    next if twitter_rest.is_me? user
+    if bangs.include? "?"
+      twitter_rest.reply_to(object, user.screen_name, TweetConstructor.help)
+    elsif bangs.include? "i"
+      twitter_rest.reply_to(object, user.screen_name, TweetConstructor.info(WdiAPI.get_info))
+    elsif bangs.include? "$"
+      twitter_rest.reply_to(object, user.screen_name, TweetConstructor.reserve)
+    elsif bangs.include? "s"
+      twitter_rest.reply_to(object, user.screen_name, TweetConstructor.talks(WdiAPI.get_talks))
+    elsif bangs.include? "m"
+      twitter_rest.reply_to(object, user.screen_name, TweetConstructor.map_link)
+    elsif bangs.include? "+"
+      twitter_rest.reply_to(object, user.screen_name, TweetConstructor.more_commands)      
+    else
+      twitter_rest.reply_to(object, user.screen_name, TweetConstructor.welcome)
     end
   end
 end
